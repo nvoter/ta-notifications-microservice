@@ -43,7 +43,6 @@ public class Notification {
     @Column(name = "title", nullable = false)
     private String title;
 
-    @Lob
     @Column(name = "message", nullable = false)
     private String message;
 
