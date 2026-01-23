@@ -1,6 +1,6 @@
 package org.fcs.notifications.microservice.dtos;
 
-import org.fcs.notifications.microservice.NotificationType;
+import org.fcs.notifications.microservice.models.NotificationType;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
