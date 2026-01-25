@@ -17,11 +17,27 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME:guest}
     password: ${RABBITMQ_PASSWORD:guest}
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS_ENABLE:true}
 
 server:
   port: ${SERVER_PORT}
 
 app:
+  confirmation-code:
+    ttl-minutes: ${CONFIRMATION_CODE_TTL_MINUTES:5}
+  mail:
+    from: ${MAIL_FROM:no-reply@yandex.ru}
+    from-name: ${MAIL_FROM_NAME:Учебные ассистенты ФКН}
   rabbitmq:
     confirmation-code:
       exchange: ${STUDENT_CONFIRMATION_CODE_EVENTS_EXCHANGE:ta.user-events}

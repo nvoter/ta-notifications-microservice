@@ -26,6 +26,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-amqp")
+    implementation("org.springframework.boot:spring-boot-starter-mail")
     implementation("org.hibernate.orm:hibernate-core:6.5.2.Final")
     implementation("jakarta.persistence:jakarta.persistence-api:3.1.0")
     runtimeOnly("org.postgresql:postgresql:42.7.7")
