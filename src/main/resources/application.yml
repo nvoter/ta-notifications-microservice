@@ -41,6 +41,10 @@ app:
     from: ${MAIL_FROM:no-reply@yandex.ru}
     from-name: ${MAIL_FROM_NAME:Учебные ассистенты ФКН}
   rabbitmq:
+    application-status:
+      exchange: ${APPLICATION_STATUS_EVENTS_EXCHANGE:ta.application-events}
+      queue: ${APPLICATION_STATUS_EVENTS_QUEUE:notifications.application-status-updated}
+      routing-key: ${APPLICATION_STATUS_EVENTS_ROUTING_KEY:application.status.updated}
     confirmation-code:
       exchange: ${STUDENT_CONFIRMATION_CODE_EVENTS_EXCHANGE:ta.user-events}
       queue: ${STUDENT_CONFIRMATION_CODE_EVENTS_QUEUE:notifications.student-confirmation-code-generated}

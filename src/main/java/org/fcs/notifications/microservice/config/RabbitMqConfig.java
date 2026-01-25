@@ -13,6 +13,31 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMqConfig {
     @Bean
+    public DirectExchange applicationStatusEventsExchange(
+            @Value("${app.rabbitmq.application-status.exchange}") String exchangeName
+    ) {
+        return new DirectExchange(exchangeName, true, false);
+    }
+
+    @Bean
+    public Queue applicationStatusEventsQueue(
+            @Value("${app.rabbitmq.application-status.queue}") String queueName
+    ) {
+        return new Queue(queueName, true);
+    }
+
+    @Bean
+    public Binding applicationStatusEventsBinding(
+            @Qualifier("applicationStatusEventsQueue") Queue applicationStatusEventsQueue,
+            @Qualifier("applicationStatusEventsExchange") DirectExchange applicationStatusEventsExchange,
+            @Value("${app.rabbitmq.application-status.routing-key}") String routingKey
+    ) {
+        return BindingBuilder.bind(applicationStatusEventsQueue)
+                .to(applicationStatusEventsExchange)
+                .with(routingKey);
+    }
+
+    @Bean
     public DirectExchange studentConfirmationCodeEventsExchange(
             @Value("${app.rabbitmq.confirmation-code.exchange}") String exchangeName
     ) {

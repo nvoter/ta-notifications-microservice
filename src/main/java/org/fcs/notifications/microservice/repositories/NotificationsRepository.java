@@ -16,6 +16,7 @@ public interface NotificationsRepository extends JpaRepository<Notification, UUI
     List<Notification> findByRecipientUserIdOrderByCreatedAtDesc(UUID recipientUserId);
     List<Notification> findByRecipientUserIdAndReadFalseOrderByCreatedAtDesc(UUID recipientUserId);
     Optional<Notification> findByIdAndRecipientUserId(UUID notificationId, UUID recipientUserId);
+    boolean existsByEventIdAndRecipientUserId(UUID eventId, UUID recipientUserId);
     @Modifying
     @Query("""
         update Notification n set n.read = true
