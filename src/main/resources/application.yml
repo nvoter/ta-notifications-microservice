@@ -33,6 +33,8 @@ server:
   port: ${SERVER_PORT}
 
 app:
+  internal:
+    api-key: ${INTERNAL_API_KEY:ta-internal-api-key}
   confirmation-code:
     ttl-minutes: ${CONFIRMATION_CODE_TTL_MINUTES:5}
   mail:
@@ -47,3 +49,9 @@ app:
       exchange: ${EMPLOYEE_CONFIRMATION_CODE_EVENTS_EXCHANGE:ta.user-events}
       queue: ${EMPLOYEE_CONFIRMATION_CODE_EVENTS_QUEUE:notifications.employee-confirmation-code-generated}
       routing-key: ${EMPLOYEE_CONFIRMATION_CODE_EVENTS_ROUTING_KEY:employee.confirmation-code.generated}
+
+clients:
+  users:
+    base-url: ${USERS_SERVICE_BASE_URL:http://users-microservice:8089/api/v1}
+  disciplines:
+    base-url: ${DISCIPLINES_SERVICE_BASE_URL:http://disciplines-microservice:8084/api/v1}

@@ -1,13 +1,15 @@
 package org.fcs.notifications.microservice;
 
 import org.fcs.notifications.microservice.config.props.MailProperties;
+import org.fcs.notifications.microservice.config.props.ServiceClientProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
 @SpringBootApplication
 @EnableConfigurationProperties({
-        MailProperties.class
+        MailProperties.class,
+        ServiceClientProperties.class
 })
 public class NotificationsMicroserviceApplication {
 
