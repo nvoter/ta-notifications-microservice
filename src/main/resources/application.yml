@@ -20,3 +20,14 @@ spring:
 
 server:
   port: ${SERVER_PORT}
+
+app:
+  rabbitmq:
+    confirmation-code:
+      exchange: ${STUDENT_CONFIRMATION_CODE_EVENTS_EXCHANGE:ta.user-events}
+      queue: ${STUDENT_CONFIRMATION_CODE_EVENTS_QUEUE:notifications.student-confirmation-code-generated}
+      routing-key: ${STUDENT_CONFIRMATION_CODE_EVENTS_ROUTING_KEY:student.confirmation-code.generated}
+    employee-confirmation-code:
+      exchange: ${EMPLOYEE_CONFIRMATION_CODE_EVENTS_EXCHANGE:ta.user-events}
+      queue: ${EMPLOYEE_CONFIRMATION_CODE_EVENTS_QUEUE:notifications.employee-confirmation-code-generated}
+      routing-key: ${EMPLOYEE_CONFIRMATION_CODE_EVENTS_ROUTING_KEY:employee.confirmation-code.generated}
