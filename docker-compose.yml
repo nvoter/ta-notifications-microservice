@@ -16,6 +16,34 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - ta-network
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: notifications-rabbitmq
+    user: "0:0"
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        chown -R rabbitmq:rabbitmq /var/lib/rabbitmq
+        exec docker-entrypoint.sh rabbitmq-server
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "${RABBITMQ_PORT}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT}:15672"
+    volumes:
+      - notifications_rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ta-network
 
   app:
     container_name: notifications-microservice
@@ -27,12 +55,21 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:${SERVER_PORT}/actuator/health" ]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 30s
+    networks:
+      - ta-network
 
 volumes:
   notifications_pgdata:
+  notifications_rabbitmq_data:
+
+networks:
+  ta-network:
+    name: ta-backend-network
