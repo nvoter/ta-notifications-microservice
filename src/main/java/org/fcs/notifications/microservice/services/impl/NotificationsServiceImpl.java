@@ -1,6 +1,7 @@
 package org.fcs.notifications.microservice.services.impl;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.fcs.notifications.microservice.dtos.NotificationDto;
 import org.fcs.notifications.microservice.entities.Notification;
 import org.fcs.notifications.microservice.exceptions.NotificationNotFoundException;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class NotificationsServiceImpl implements NotificationsService {
@@ -37,12 +39,15 @@ public class NotificationsServiceImpl implements NotificationsService {
         Notification notification = notificationsRepository.findByIdAndRecipientUserId(notificationId, userId)
                 .orElseThrow(() -> new NotificationNotFoundException(userId, notificationId));
         notification.setRead(true);
+        log.info("Уведомление помечено как прочитанное: userId={}, notificationId={}", userId, notificationId);
         return NotificationDto.fromEntity(notification);
     }
 
     @Override
     @Transactional
     public int markAllNotificationsAsRead(UUID userId) {
-        return notificationsRepository.markAllRead(userId);
+        int updatedCount = notificationsRepository.markAllRead(userId);
+        log.info("Все уведомления пользователя помечены как прочитанные: userId={}, updatedCount={}", userId, updatedCount);
+        return updatedCount;
     }
 }

@@ -1,6 +1,7 @@
 package org.fcs.notifications.microservice.services.impl;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.fcs.notifications.microservice.clients.DisciplinesServiceClient;
 import org.fcs.notifications.microservice.clients.UsersServiceClient;
 import org.fcs.notifications.microservice.dtos.disciplines.DisciplineDetailsDto;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ApplicationStatusNotificationsProcessorImpl implements ApplicationStatusNotificationsProcessor {
@@ -35,6 +37,7 @@ public class ApplicationStatusNotificationsProcessorImpl implements ApplicationS
         boolean employeeNotificationExists =
                 notificationsRepository.existsByEventIdAndRecipientUserId(event.eventId(), event.employeeId());
         if (studentNotificationExists && employeeNotificationExists) {
+            log.info("Пропущена повторная обработка события статуса заявки: eventId={}", event.eventId());
             return;
         }
 
@@ -58,6 +61,11 @@ public class ApplicationStatusNotificationsProcessorImpl implements ApplicationS
 
         sendStudentEmail(student, employee, discipline.name(), event.newStatus());
         sendEmployeeEmail(employee, student, discipline.name(), event.newStatus());
+        log.info(
+                "Обработано событие обновления статуса заявки: eventId={}, applicationDisciplineId={}",
+                event.eventId(),
+                event.applicationDisciplineId()
+        );
     }
 
     private void saveNotificationIfMissing(

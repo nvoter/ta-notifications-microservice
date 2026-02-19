@@ -1,6 +1,7 @@
 package org.fcs.notifications.microservice.clients;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.fcs.notifications.microservice.config.props.ServiceClientProperties;
 import org.fcs.notifications.microservice.dtos.users.EmployeeProfileDto;
 import org.fcs.notifications.microservice.dtos.users.StudentProfileDto;
@@ -10,6 +11,7 @@ import org.springframework.web.client.RestClient;
 
 import java.util.UUID;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class UsersServiceClient {
@@ -20,6 +22,7 @@ public class UsersServiceClient {
     private String internalApiKey;
 
     public StudentProfileDto getStudentById(UUID studentId) {
+        log.info("Запрошен профиль студента: studentId={}", studentId);
         return restClientBuilder.build()
                 .get()
                 .uri(serviceClientProperties.users().baseUrl() + "/internal/students/{studentId}", studentId)
@@ -29,6 +32,7 @@ public class UsersServiceClient {
     }
 
     public EmployeeProfileDto getEmployeeById(UUID employeeId) {
+        log.info("Запрошен профиль сотрудника: employeeId={}", employeeId);
         return restClientBuilder.build()
                 .get()
                 .uri(serviceClientProperties.users().baseUrl() + "/internal/employees/{employeeId}", employeeId)
