@@ -25,6 +25,7 @@ dependencies {
     implementation("io.swagger.core.v3:swagger-annotations-jakarta:2.2.41")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("io.micrometer:micrometer-registry-prometheus:1.16.2")
     implementation("org.springframework.boot:spring-boot-starter-amqp")
     implementation("org.springframework.boot:spring-boot-starter-mail")
     implementation("org.hibernate.orm:hibernate-core:6.5.2.Final")
