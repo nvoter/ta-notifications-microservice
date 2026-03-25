@@ -9,6 +9,8 @@ group = "org.fcs"
 version = "0.0.1-SNAPSHOT"
 description = "notifications-microservice"
 
+val jooqVersion = "3.19.18"
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
@@ -23,6 +25,17 @@ repositories {
     mavenCentral()
 }
 
+val generatedJooqDir = layout.buildDirectory.dir("generated-src/jooq/main")
+val schemaToolsDir = layout.buildDirectory.dir("classes/schema-tools")
+val migrationDir = layout.projectDirectory.dir("src/main/resources/db/migration")
+val schemaTools by configurations.creating
+
+sourceSets {
+    named("main") {
+        java.srcDir(generatedJooqDir)
+    }
+}
+
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
@@ -34,6 +47,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-amqp")
     implementation("org.springframework.boot:spring-boot-starter-mail")
     implementation("org.hibernate.orm:hibernate-core:6.5.2.Final")
+    implementation("org.jooq:jooq:$jooqVersion")
     implementation("jakarta.persistence:jakarta.persistence-api:3.1.0")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0")
     implementation("org.flywaydb:flyway-core")
@@ -43,6 +57,58 @@ dependencies {
     annotationProcessor("org.projectlombok:lombok")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    schemaTools("org.flywaydb:flyway-core")
+    schemaTools("org.flywaydb:flyway-database-postgresql")
+    schemaTools("org.postgresql:postgresql:42.7.7")
+    schemaTools("org.testcontainers:postgresql:1.20.4")
+    schemaTools("org.jooq:jooq-codegen:$jooqVersion")
+    schemaTools("org.jooq:jooq-meta:$jooqVersion")
+    schemaTools("org.jooq:jooq:$jooqVersion")
+    schemaTools("org.hibernate.orm:hibernate-core:6.5.2.Final")
+    schemaTools("jakarta.persistence:jakarta.persistence-api:3.1.0")
+}
+
+val compileSchemaToolsJava by tasks.registering(JavaCompile::class) {
+    group = "build setup"
+    description = "Compiles local build-time schema tool classes."
+    source = fileTree("gradle/schema-tools") {
+        include("**/*.java")
+    }
+    classpath = schemaTools
+    destinationDirectory.set(schemaToolsDir)
+    options.release.set(21)
+}
+
+val generateJooqFromSchema by tasks.registering(JavaExec::class) {
+    group = "build"
+    description = "Applies Flyway migrations to a temporary PostgreSQL instance and generates jOOQ sources from the resulting schema"
+    dependsOn(compileSchemaToolsJava)
+    classpath = files(schemaToolsDir) + schemaTools
+    mainClass.set("org.fcs.notifications.microservice.schematools.SchemaCodegenMain")
+    inputs.files(fileTree("src/main/resources/db/migration"))
+    outputs.dir(generatedJooqDir)
+    args(
+        generatedJooqDir.get().asFile.absolutePath,
+        migrationDir.asFile.absolutePath
+    )
+}
+
+val validateJpaMappingsAgainstSchema by tasks.registering(JavaExec::class) {
+    group = "verification"
+    description = "Validates JPA mappings against a schema created from Flyway migrations on a temporary PostgreSQL instance"
+    dependsOn(tasks.named("classes"), compileSchemaToolsJava)
+    classpath = files(schemaToolsDir) + schemaTools + sourceSets["main"].runtimeClasspath
+    mainClass.set("org.fcs.notifications.microservice.schematools.SchemaValidationMain")
+    inputs.files(
+        fileTree("src/main/resources/db/migration"),
+        fileTree("src/main/java/org/fcs/notifications/microservice/entities")
+    )
+    args(migrationDir.asFile.absolutePath)
+}
+
+tasks.named("compileJava") {
+    dependsOn(generateJooqFromSchema)
 }
 
 tasks.jacocoTestReport {
@@ -72,6 +138,7 @@ tasks.jacocoTestCoverageVerification {
 
 tasks.check {
     dependsOn(tasks.jacocoTestCoverageVerification)
+    dependsOn(validateJpaMappingsAgainstSchema)
 }
 
 val jacocoExcludes = listOf(
@@ -84,7 +151,8 @@ val jacocoExcludes = listOf(
     "**/config/**",
     "**/events/**",
     "**/clients/**",
-    "**/messaging/**"
+    "**/messaging/**",
+    "**/jooq/**"
 )
 
 tasks.withType<JacocoReport>().configureEach {
