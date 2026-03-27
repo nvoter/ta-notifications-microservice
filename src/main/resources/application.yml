@@ -34,7 +34,7 @@ spring:
     locations: classpath:db/migration
 
 server:
-  port: ${SERVER_PORT}
+  port: ${SERVER_PORT:8088}
 
 app:
   internal:
