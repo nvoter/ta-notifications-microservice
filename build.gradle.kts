@@ -29,6 +29,9 @@ val generatedJooqDir = layout.buildDirectory.dir("generated-src/jooq/main")
 val schemaToolsDir = layout.buildDirectory.dir("classes/schema-tools")
 val migrationDir = layout.projectDirectory.dir("src/main/resources/db/migration")
 val schemaTools by configurations.creating
+val skipSchemaTasks = providers.gradleProperty("skipSchemaTasks")
+    .map(String::toBoolean)
+    .orElse(false)
 
 sourceSets {
     named("main") {
@@ -92,6 +95,7 @@ val generateJooqFromSchema by tasks.registering(JavaExec::class) {
         generatedJooqDir.get().asFile.absolutePath,
         migrationDir.asFile.absolutePath
     )
+    onlyIf { !skipSchemaTasks.get() }
 }
 
 val validateJpaMappingsAgainstSchema by tasks.registering(JavaExec::class) {
@@ -105,10 +109,13 @@ val validateJpaMappingsAgainstSchema by tasks.registering(JavaExec::class) {
         fileTree("src/main/java/org/fcs/notifications/microservice/entities")
     )
     args(migrationDir.asFile.absolutePath)
+    onlyIf { !skipSchemaTasks.get() }
 }
 
 tasks.named("compileJava") {
-    dependsOn(generateJooqFromSchema)
+    if (!skipSchemaTasks.get()) {
+        dependsOn(generateJooqFromSchema)
+    }
 }
 
 tasks.jacocoTestReport {
@@ -138,7 +145,9 @@ tasks.jacocoTestCoverageVerification {
 
 tasks.check {
     dependsOn(tasks.jacocoTestCoverageVerification)
-    dependsOn(validateJpaMappingsAgainstSchema)
+    if (!skipSchemaTasks.get()) {
+        dependsOn(validateJpaMappingsAgainstSchema)
+    }
 }
 
 val jacocoExcludes = listOf(

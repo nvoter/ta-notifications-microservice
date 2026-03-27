@@ -4,7 +4,7 @@ COPY gradlew settings.gradle.kts build.gradle.kts ./
 COPY gradle ./gradle
 RUN ./gradlew --no-daemon help || true
 COPY . .
-RUN ./gradlew bootJar -x test --no-daemon
+RUN ./gradlew bootJar -x test -PskipSchemaTasks=true --no-daemon
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
