@@ -88,6 +88,31 @@ public class RabbitMqConfig {
     }
 
     @Bean
+    public DirectExchange interestedPaidApplicationReminderEventsExchange(
+            @Value("${app.rabbitmq.interested-paid-reminder.exchange}") String exchangeName
+    ) {
+        return new DirectExchange(exchangeName, true, false);
+    }
+
+    @Bean
+    public Queue interestedPaidApplicationReminderEventsQueue(
+            @Value("${app.rabbitmq.interested-paid-reminder.queue}") String queueName
+    ) {
+        return new Queue(queueName, true);
+    }
+
+    @Bean
+    public Binding interestedPaidApplicationReminderEventsBinding(
+            @Qualifier("interestedPaidApplicationReminderEventsQueue") Queue interestedPaidApplicationReminderEventsQueue,
+            @Qualifier("interestedPaidApplicationReminderEventsExchange") DirectExchange interestedPaidApplicationReminderEventsExchange,
+            @Value("${app.rabbitmq.interested-paid-reminder.routing-key}") String routingKey
+    ) {
+        return BindingBuilder.bind(interestedPaidApplicationReminderEventsQueue)
+                .to(interestedPaidApplicationReminderEventsExchange)
+                .with(routingKey);
+    }
+
+    @Bean
     public Jackson2JsonMessageConverter jackson2JsonMessageConverter() {
         return new Jackson2JsonMessageConverter();
     }
