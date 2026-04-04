@@ -59,8 +59,8 @@ public class ApplicationStatusNotificationsProcessorImpl implements ApplicationS
                 buildEmployeeNotificationMessage(student, discipline.name(), event.newStatus())
         );
 
-        sendStudentEmail(student, employee, discipline.name(), event.newStatus());
-        sendEmployeeEmail(employee, student, discipline.name(), event.newStatus());
+        sendStudentEmail(student, employee, discipline.name(), discipline.assignment(), event.newStatus());
+        sendEmployeeEmail(employee, student, discipline.name(), discipline.assignment(), event.newStatus());
         log.info(
                 "Обработано событие обновления статуса заявки: eventId={}, applicationDisciplineId={}",
                 event.eventId(),
@@ -95,12 +95,13 @@ public class ApplicationStatusNotificationsProcessorImpl implements ApplicationS
             StudentProfileDto student,
             EmployeeProfileDto employee,
             String disciplineName,
+            String assignment,
             String newStatus
     ) {
         emailService.sendHtmlEmail(
                 student.email(),
                 "Изменен статус заявки на дисциплину",
-                buildStudentEmailHtml(student, employee, disciplineName, newStatus)
+                buildStudentEmailHtml(student, employee, disciplineName, assignment, newStatus)
         );
     }
 
@@ -108,12 +109,13 @@ public class ApplicationStatusNotificationsProcessorImpl implements ApplicationS
             EmployeeProfileDto employee,
             StudentProfileDto student,
             String disciplineName,
+            String assignment,
             String newStatus
     ) {
         emailService.sendHtmlEmail(
                 employee.email(),
                 "Подтверждение изменения статуса заявки",
-                buildEmployeeEmailHtml(student, disciplineName, newStatus)
+                buildEmployeeEmailHtml(student, disciplineName, assignment, newStatus)
         );
     }
 
@@ -132,6 +134,7 @@ public class ApplicationStatusNotificationsProcessorImpl implements ApplicationS
             StudentProfileDto student,
             EmployeeProfileDto employee,
             String disciplineName,
+            String assignment,
             String newStatus
     ) {
         return buildEmailShell(
@@ -139,6 +142,7 @@ public class ApplicationStatusNotificationsProcessorImpl implements ApplicationS
                 """
                 <p class="description">%s, статус Вашей заявки на дисциплину %s изменен на %s</p>
                 <div class="details">
+                  %s
                   <p class="detail-line">Сотрудник, изменивший статус:</p>
                   <p class="detail-line">%s</p>
                   <p class="detail-line">При возникновении вопросов можете связаться с ним по почте</p>
@@ -148,6 +152,7 @@ public class ApplicationStatusNotificationsProcessorImpl implements ApplicationS
                         escapeHtml(displayName(student.firstName(), student.middleName())),
                         escapeHtml(disciplineName),
                         escapeHtml(russianStatus(newStatus)),
+                        buildAssignmentHtml(newStatus, assignment),
                         escapeHtml(employee.fullName()),
                         escapeHtml(employee.email())
                 )
@@ -157,6 +162,7 @@ public class ApplicationStatusNotificationsProcessorImpl implements ApplicationS
     private String buildEmployeeEmailHtml(
             StudentProfileDto student,
             String disciplineName,
+            String assignment,
             String newStatus
     ) {
         return buildEmailShell(
@@ -164,6 +170,7 @@ public class ApplicationStatusNotificationsProcessorImpl implements ApplicationS
                 """
                 <p class="description">Вы установили статус %s заявке студента %s на дисциплину %s</p>
                 <div class="details">
+                  %s
                   <p class="detail-line">Контакты студента для связи:</p>
                   <p class="detail-line">Telegram: %s</p>
                   <p class="detail-line">Почта: %s</p>
@@ -172,10 +179,22 @@ public class ApplicationStatusNotificationsProcessorImpl implements ApplicationS
                         escapeHtml(russianStatus(newStatus)),
                         escapeHtml(student.fullName()),
                         escapeHtml(disciplineName),
+                        buildAssignmentHtml(newStatus, assignment),
                         escapeHtml(fallback(student.telegram(), "Не указан")),
                         escapeHtml(fallback(student.email(), "Не указана"))
                 )
         );
+    }
+
+    private String buildAssignmentHtml(String status, String assignment) {
+        if (!"INTERESTED".equals(normalizeStatus(status))) {
+            return "";
+        }
+
+        return """
+                <p class="detail-line">Задание дисциплины:</p>
+                <p class="detail-line">%s</p>
+                """.formatted(escapeHtml(fallback(assignment, "Не указано")));
     }
 
     private String buildEmailShell(String title, String content) {
@@ -255,11 +274,12 @@ public class ApplicationStatusNotificationsProcessorImpl implements ApplicationS
 
     private String russianStatus(String status) {
         return switch (normalizeStatus(status)) {
-            case "NEW" -> "Новая";
+            case "NEW" -> "Новый";
             case "INTERESTED" -> "Заинтересован";
-            case "AGREED" -> "Согласовано";
+            case "AGREED" -> "На согласовании";
+            case "REJECTED" -> "Отклонено";
             case "APPROVED" -> "Утвержден";
-            case "DELETED" -> "Удалена";
+            case "DELETED" -> "Удалено";
             default -> status;
         };
     }

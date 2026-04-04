@@ -19,9 +19,9 @@ public class EmployeeConfirmationCodeNotificationsProcessorImpl implements Emplo
                 event.email(),
                 "Код подтверждения для входа",
                 confirmationCodeEmailTemplateService.buildHtml(
-                        event.firstName(),
-                        event.lastName(),
-                        event.middleName(),
+                        event.fullName(),
+                        null,
+                        null,
                         event.confirmationCode()
                 )
         );
