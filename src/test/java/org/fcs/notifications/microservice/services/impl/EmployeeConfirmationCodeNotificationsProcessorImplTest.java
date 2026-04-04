@@ -30,13 +30,11 @@ class EmployeeConfirmationCodeNotificationsProcessorImplTest {
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 "employee@test.com",
-                "Petrov",
-                "Petr",
-                "Petrovich",
+                "Petrov Petr Petrovich",
                 "654321",
                 OffsetDateTime.now()
         );
-        when(confirmationCodeEmailTemplateService.buildHtml("Petr", "Petrov", "Petrovich", "654321"))
+        when(confirmationCodeEmailTemplateService.buildHtml("Petrov Petr Petrovich", null, null, "654321"))
                 .thenReturn("<html/>");
 
         service.process(event);

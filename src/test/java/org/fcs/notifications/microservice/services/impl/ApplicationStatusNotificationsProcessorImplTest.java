@@ -20,6 +20,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -58,8 +59,8 @@ class ApplicationStatusNotificationsProcessorImplTest {
     void process_whenNotificationsMissing_thenSaveAndSendEmails() {
         ApplicationDisciplineStatusUpdatedEvent event = event("APPROVED");
         StudentProfileDto student = student(event.studentId(), "student@test.com", "Иванов", "Иван", " ", " ");
-        EmployeeProfileDto employee = employee(event.employeeId(), "teacher@test.com", "Петров", "Петр", "Петрович");
-        DisciplineDetailsDto discipline = new DisciplineDetailsDto(event.disciplineId(), UUID.randomUUID(), "Math & <Stats>", "1", java.util.List.of(1), 1, 1, "assignment");
+        EmployeeProfileDto employee = employee(event.employeeId(), "teacher@test.com", "Петров Петр Петрович");
+        DisciplineDetailsDto discipline = discipline(event.disciplineId(), "Math & <Stats>", "assignment");
         when(notificationsRepository.existsByEventIdAndRecipientUserId(any(), any())).thenReturn(false);
         when(usersServiceClient.getEmployeeById(event.employeeId())).thenReturn(employee);
         when(usersServiceClient.getStudentById(event.studentId())).thenReturn(student);
@@ -77,14 +78,53 @@ class ApplicationStatusNotificationsProcessorImplTest {
     }
 
     @Test
+    void process_whenInterestedStatus_thenIncludeAssignmentOnlyInEmails() {
+        ApplicationDisciplineStatusUpdatedEvent event = event("INTERESTED");
+        StudentProfileDto student = student(event.studentId(), "student@test.com", "Иванов", "Иван", "Иванович", "@ivanov");
+        EmployeeProfileDto employee = employee(event.employeeId(), "teacher@test.com", "Петров Петр Петрович");
+        DisciplineDetailsDto discipline = discipline(event.disciplineId(), "Math", "Решить 5 задач <до пятницы>");
+        when(notificationsRepository.existsByEventIdAndRecipientUserId(any(), any())).thenReturn(false);
+        when(usersServiceClient.getEmployeeById(event.employeeId())).thenReturn(employee);
+        when(usersServiceClient.getStudentById(event.studentId())).thenReturn(student);
+        when(disciplinesServiceClient.getDisciplineById(event.disciplineId())).thenReturn(discipline);
+
+        service.process(event);
+
+        ArgumentCaptor<String> htmlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService, times(2)).sendHtmlEmail(any(), any(), htmlCaptor.capture());
+        assertEquals(2, htmlCaptor.getAllValues().size());
+        assertTrue(htmlCaptor.getAllValues().getFirst().contains("Задание дисциплины:"));
+        assertTrue(htmlCaptor.getAllValues().getFirst().contains("Решить 5 задач &lt;до пятницы&gt;"));
+        assertTrue(htmlCaptor.getAllValues().getLast().contains("Задание дисциплины:"));
+        assertTrue(htmlCaptor.getAllValues().getLast().contains("Решить 5 задач &lt;до пятницы&gt;"));
+    }
+
+    @Test
+    void process_whenStatusIsNotInterested_thenDoNotIncludeAssignmentInEmails() {
+        ApplicationDisciplineStatusUpdatedEvent event = event("AGREED");
+        when(notificationsRepository.existsByEventIdAndRecipientUserId(any(), any())).thenReturn(false);
+        when(usersServiceClient.getEmployeeById(event.employeeId())).thenReturn(employee(event.employeeId(), "teacher@test.com", "Петров Петр Петрович"));
+        when(usersServiceClient.getStudentById(event.studentId())).thenReturn(student(event.studentId(), "student@test.com", "Иванов", "Иван", "Иванович", "@ivanov"));
+        when(disciplinesServiceClient.getDisciplineById(event.disciplineId())).thenReturn(discipline(event.disciplineId(), "Math", "Скрытое задание"));
+
+        service.process(event);
+
+        ArgumentCaptor<String> htmlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService, times(2)).sendHtmlEmail(any(), any(), htmlCaptor.capture());
+        assertFalse(htmlCaptor.getAllValues().getFirst().contains("Задание дисциплины:"));
+        assertFalse(htmlCaptor.getAllValues().getLast().contains("Задание дисциплины:"));
+        assertFalse(htmlCaptor.getAllValues().getFirst().contains("Скрытое задание"));
+        assertFalse(htmlCaptor.getAllValues().getLast().contains("Скрытое задание"));
+    }
+
+    @Test
     void process_whenStudentNotificationExists_thenSaveOnlyEmployeeNotification() {
         ApplicationDisciplineStatusUpdatedEvent event = event("UNKNOWN");
         when(notificationsRepository.existsByEventIdAndRecipientUserId(event.eventId(), event.studentId())).thenReturn(true);
         when(notificationsRepository.existsByEventIdAndRecipientUserId(event.eventId(), event.employeeId())).thenReturn(false);
-        when(usersServiceClient.getEmployeeById(event.employeeId())).thenReturn(employee(event.employeeId(), "teacher@test.com", "Petrov", "Petr", null));
+        when(usersServiceClient.getEmployeeById(event.employeeId())).thenReturn(employee(event.employeeId(), "teacher@test.com", "Petrov Petr"));
         when(usersServiceClient.getStudentById(event.studentId())).thenReturn(student(event.studentId(), null, null, " ", null, "tg"));
-        when(disciplinesServiceClient.getDisciplineById(event.disciplineId()))
-                .thenReturn(new DisciplineDetailsDto(event.disciplineId(), UUID.randomUUID(), "Discipline", "1", java.util.List.of(1), 1, 1, "assignment"));
+        when(disciplinesServiceClient.getDisciplineById(event.disciplineId())).thenReturn(discipline(event.disciplineId(), "Discipline", "assignment"));
 
         service.process(event);
 
@@ -125,17 +165,19 @@ class ApplicationStatusNotificationsProcessorImplTest {
         );
     }
 
-    private static EmployeeProfileDto employee(UUID id, String email, String lastName, String firstName, String middleName) {
+    private static EmployeeProfileDto employee(UUID id, String email, String fullName) {
         return new EmployeeProfileDto(
                 id,
                 email,
-                lastName,
-                firstName,
-                middleName,
+                fullName,
                 "TEACHER",
                 true,
                 OffsetDateTime.now(),
                 OffsetDateTime.now()
         );
+    }
+
+    private static DisciplineDetailsDto discipline(UUID id, String name, String assignment) {
+        return new DisciplineDetailsDto(id, UUID.randomUUID(), name, "1", java.util.List.of(1), 1, 1, assignment);
     }
 }
