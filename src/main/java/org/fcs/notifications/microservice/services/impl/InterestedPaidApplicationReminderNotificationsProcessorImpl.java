@@ -3,13 +3,21 @@ package org.fcs.notifications.microservice.services.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fcs.notifications.microservice.clients.UsersServiceClient;
+import org.fcs.notifications.microservice.dtos.reminders.InterestedEmployeeReminderDto;
+import org.fcs.notifications.microservice.dtos.users.EmployeeProfileDto;
 import org.fcs.notifications.microservice.dtos.users.StudentReminderRecipientDto;
 import org.fcs.notifications.microservice.events.InterestedPaidApplicationReminderEvent;
 import org.fcs.notifications.microservice.services.EmailService;
 import org.fcs.notifications.microservice.services.InterestedPaidApplicationReminderNotificationsProcessor;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -21,34 +29,118 @@ public class InterestedPaidApplicationReminderNotificationsProcessorImpl
 
     @Override
     public void process(InterestedPaidApplicationReminderEvent event) {
-        if (event.studentIds() == null || event.studentIds().isEmpty()) {
+        boolean hasStudentRecipients = event.studentIds() != null && !event.studentIds().isEmpty();
+        boolean hasEmployeeRecipients = event.employeeReminders() != null && !event.employeeReminders().isEmpty();
+        if (!hasStudentRecipients && !hasEmployeeRecipients) {
             log.info("Событие-напоминание не содержит получателей: eventId={}", event.eventId());
             return;
         }
 
-        List<StudentReminderRecipientDto> students = usersServiceClient.getStudentsByIds(event.studentIds());
+        List<StudentReminderRecipientDto> students = hasStudentRecipients
+                ? usersServiceClient.getStudentsByIds(event.studentIds())
+                : List.of();
+        Map<UUID, StudentReminderRecipientDto> studentsById = students.stream()
+                .collect(Collectors.toMap(StudentReminderRecipientDto::id, Function.identity()));
 
+        sendStudentEmails(students);
+        sendEmployeeEmails(event.employeeReminders(), studentsById);
+
+        log.info(
+                "Отправлены напоминания о загрузке документов: eventId={}, studentRecipientsCount={}, employeeRecipientsCount={}",
+                event.eventId(),
+                students.size(),
+                hasEmployeeRecipients ? event.employeeReminders().size() : 0
+        );
+    }
+
+    private void sendStudentEmails(List<StudentReminderRecipientDto> students) {
         for (StudentReminderRecipientDto student : students) {
             if (student.email() == null || student.email().isBlank()) {
                 log.warn("Пропущена отправка напоминания студенту без email: studentId={}", student.id());
                 continue;
             }
 
-            emailService.sendHtmlEmail(
-                    student.email(),
-                    "Напоминание о загрузке документов",
-                    buildEmailHtml(student)
-            );
+            emailService.sendHtmlEmail(student.email(), "Напоминание о загрузке документов", buildStudentEmailHtml(student));
+        }
+    }
+
+    private void sendEmployeeEmails(
+            List<InterestedEmployeeReminderDto> employeeReminders,
+            Map<UUID, StudentReminderRecipientDto> studentsById
+    ) {
+        if (employeeReminders == null || employeeReminders.isEmpty()) {
+            return;
         }
 
-        log.info(
-                "Отправлены напоминания о загрузке документов: eventId={}, recipientsCount={}",
-                event.eventId(),
-                students.size()
+        List<UUID> employeeIds = employeeReminders.stream()
+                .map(InterestedEmployeeReminderDto::employeeId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (employeeIds.isEmpty()) {
+            return;
+        }
+
+        Map<UUID, EmployeeProfileDto> employeesById = usersServiceClient.getEmployeesByIds(employeeIds).stream()
+                .collect(Collectors.toMap(EmployeeProfileDto::id, Function.identity()));
+
+        for (InterestedEmployeeReminderDto reminder : employeeReminders) {
+            EmployeeProfileDto employee = employeesById.get(reminder.employeeId());
+            if (employee == null) {
+                log.warn("Пропущена отправка напоминания преподавателю: employeeId={} не найден", reminder.employeeId());
+                continue;
+            }
+
+            List<StudentReminderRecipientDto> students = reminder.studentIds().stream()
+                    .map(studentsById::get)
+                    .filter(Objects::nonNull)
+                    .sorted(Comparator.comparing(StudentReminderRecipientDto::fullName, String.CASE_INSENSITIVE_ORDER))
+                    .toList();
+            if (students.isEmpty()) {
+                continue;
+            }
+
+            String subject = "Напоминание о загрузке документов студентов";
+            String htmlBody = buildEmployeeEmailHtml(employee, students);
+            sendEmailToEmployeeAddresses(employee.email(), employee.backupEmail(), subject, htmlBody);
+        }
+    }
+
+    private String buildStudentEmailHtml(StudentReminderRecipientDto student) {
+        return buildEmailShell(
+                "Напоминание о документах",
+                """
+                <p class="description">%s, Вы подавали заявку на трудоустройство учебным ассистентом на платной основе. Пожалуйста, заполните форму сбора документов в личном кабинете для дальнейшей обработки заявки</p>
+                <div class="footnotes">
+                  <p class="footnote">Если Вы недавно уже заполняли форму, проигнорируйте это письмо</p>
+                </div>
+                """.formatted(escapeHtml(fallback(student.displayName(), "Здравствуйте")))
         );
     }
 
-    private String buildEmailHtml(StudentReminderRecipientDto student) {
+    private String buildEmployeeEmailHtml(EmployeeProfileDto employee, List<StudentReminderRecipientDto> students) {
+        String studentsHtml = students.stream()
+                .map(student -> "<p class=\"detail-line\">" + escapeHtml(student.fullName()) + "</p>")
+                .collect(Collectors.joining());
+
+        return buildEmailShell(
+                "Напоминание о документах",
+                """
+                <p class="description">%s, следующие студенты, заявкам которых Вы выставили статус «Заинтересован», все еще не предоставили пакет необходимых документов:</p>
+                <div class="details">
+                  %s
+                </div>
+                <div class="footnotes">
+                  <p class="footnote">Пожалуйста, напомните им заполнить форму сбора документов в личном кабинете для дальнейшей обработки заявки</p>
+                </div>
+                """.formatted(
+                        escapeHtml(fallback(shortEmployeeName(employee.fullName()), "Здравствуйте")),
+                        studentsHtml
+                )
+        );
+    }
+
+    private String buildEmailShell(String title, String content) {
         return """
                 <!DOCTYPE html>
                 <html lang="ru">
@@ -96,6 +188,20 @@ public class InterestedPaidApplicationReminderNotificationsProcessorImpl
                       line-height: 1.5;
                     }
 
+                    .details {
+                      margin-top: 24px;
+                      border-radius: 24px;
+                      padding: 24px;
+                      background: rgba(16, 45, 105, 0.05);
+                    }
+
+                    .detail-line {
+                      margin: 8px 0 0;
+                      color: #102d69;
+                      font-size: 16px;
+                      line-height: 1.5;
+                    }
+
                     .footnotes {
                       margin-top: 32px;
                     }
@@ -112,16 +218,54 @@ public class InterestedPaidApplicationReminderNotificationsProcessorImpl
                 <body>
                   <div class="shell">
                     <div class="card">
-                      <h1 class="title">Напоминание о документах</h1>
-                      <p class="description">%s, Вы подавали заявку на трудоустройство учебным ассистентом на платной основе. Пожалуйста, заполните форму сбора документов в личном кабинете для дальнейшей обработки заявки.</p>
-                      <div class="footnotes">
-                        <p class="footnote">Если Вы недавно уже заполняли форму, проигнорируйте это письмо.</p>
-                      </div>
+                      <h1 class="title">%s</h1>
+                      %s
                     </div>
                   </div>
                 </body>
                 </html>
-                """.formatted(escapeHtml(fallback(student.displayName(), "Здравствуйте")));
+                """.formatted(escapeHtml(title), content);
+    }
+
+    private void sendEmailToEmployeeAddresses(String email, String backupEmail, String subject, String htmlBody) {
+        sendEmailIfPresent(email, subject, htmlBody);
+        if (!isDistinctEmail(backupEmail, email)) {
+            return;
+        }
+
+        sendEmailIfPresent(backupEmail, subject, htmlBody);
+    }
+
+    private void sendEmailIfPresent(String email, String subject, String htmlBody) {
+        if (email == null || email.isBlank()) {
+            return;
+        }
+
+        emailService.sendHtmlEmail(email, subject, htmlBody);
+    }
+
+    private boolean isDistinctEmail(String email, String referenceEmail) {
+        if (email == null || email.isBlank()) {
+            return false;
+        }
+        if (referenceEmail == null || referenceEmail.isBlank()) {
+            return true;
+        }
+
+        return !email.trim().equalsIgnoreCase(referenceEmail.trim());
+    }
+
+    private String shortEmployeeName(String fullName) {
+        if (fullName == null || fullName.isBlank()) {
+            return "Здравствуйте";
+        }
+
+        String[] parts = fullName.trim().split("\\s+");
+        if (parts.length < 2) {
+            return fullName.trim();
+        }
+
+        return parts[0] + " " + parts[1];
     }
 
     private String fallback(String value, String defaultValue) {

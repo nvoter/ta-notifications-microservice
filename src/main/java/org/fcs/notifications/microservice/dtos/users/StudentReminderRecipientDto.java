@@ -15,4 +15,11 @@ public record StudentReminderRecipientDto(
                 .map(String::trim)
                 .collect(java.util.stream.Collectors.joining(" "));
     }
+
+    public String fullName() {
+        return java.util.stream.Stream.of(lastName, firstName, middleName)
+                .filter(value -> value != null && !value.isBlank())
+                .map(String::trim)
+                .collect(java.util.stream.Collectors.joining(" "));
+    }
 }

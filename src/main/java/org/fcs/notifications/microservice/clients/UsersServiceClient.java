@@ -3,6 +3,7 @@ package org.fcs.notifications.microservice.clients;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fcs.notifications.microservice.config.props.ServiceClientProperties;
+import org.fcs.notifications.microservice.dtos.internal.GetEmployeesByIdsRequest;
 import org.fcs.notifications.microservice.dtos.internal.GetStudentsByIdsRequest;
 import org.fcs.notifications.microservice.dtos.users.EmployeeProfileDto;
 import org.fcs.notifications.microservice.dtos.users.StudentProfileDto;
@@ -19,6 +20,13 @@ import java.util.UUID;
 @Component
 @RequiredArgsConstructor
 public class UsersServiceClient {
+    private static final ParameterizedTypeReference<List<StudentReminderRecipientDto>> STUDENT_REMINDERS_LIST_TYPE =
+            new ParameterizedTypeReference<>() {
+            };
+    private static final ParameterizedTypeReference<List<EmployeeProfileDto>> EMPLOYEES_LIST_TYPE =
+            new ParameterizedTypeReference<>() {
+            };
+
     private final RestClient.Builder restClientBuilder;
     private final ServiceClientProperties serviceClientProperties;
 
@@ -43,8 +51,18 @@ public class UsersServiceClient {
                 .header("X-Internal-Api-Key", internalApiKey)
                 .body(new GetStudentsByIdsRequest(studentIds))
                 .retrieve()
-                .body(new ParameterizedTypeReference<>() {
-                });
+                .body(STUDENT_REMINDERS_LIST_TYPE);
+    }
+
+    public List<EmployeeProfileDto> getEmployeesByIds(List<UUID> employeeIds) {
+        log.info("Запрошены профили сотрудников: employeeIdsCount={}", employeeIds.size());
+        return restClientBuilder.build()
+                .post()
+                .uri(serviceClientProperties.users().baseUrl() + "/internal/employees/by-ids")
+                .header("X-Internal-Api-Key", internalApiKey)
+                .body(new GetEmployeesByIdsRequest(employeeIds))
+                .retrieve()
+                .body(EMPLOYEES_LIST_TYPE);
     }
 
     public EmployeeProfileDto getEmployeeById(UUID employeeId) {
