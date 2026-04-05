@@ -112,11 +112,37 @@ public class ApplicationStatusNotificationsProcessorImpl implements ApplicationS
             String assignment,
             String newStatus
     ) {
-        emailService.sendHtmlEmail(
-                employee.email(),
-                "Подтверждение изменения статуса заявки",
-                buildEmployeeEmailHtml(student, disciplineName, assignment, newStatus)
-        );
+        String subject = "Подтверждение изменения статуса заявки";
+        String htmlBody = buildEmployeeEmailHtml(student, disciplineName, assignment, newStatus);
+        sendEmailToEmployeeAddresses(employee.email(), employee.backupEmail(), subject, htmlBody);
+    }
+
+    private void sendEmailToEmployeeAddresses(String email, String backupEmail, String subject, String htmlBody) {
+        sendEmailIfPresent(email, subject, htmlBody);
+        if (!isDistinctEmail(backupEmail, email)) {
+            return;
+        }
+
+        sendEmailIfPresent(backupEmail, subject, htmlBody);
+    }
+
+    private void sendEmailIfPresent(String email, String subject, String htmlBody) {
+        if (email == null || email.isBlank()) {
+            return;
+        }
+
+        emailService.sendHtmlEmail(email, subject, htmlBody);
+    }
+
+    private boolean isDistinctEmail(String email, String referenceEmail) {
+        if (email == null || email.isBlank()) {
+            return false;
+        }
+        if (referenceEmail == null || referenceEmail.isBlank()) {
+            return true;
+        }
+
+        return !email.trim().equalsIgnoreCase(referenceEmail.trim());
     }
 
     private String buildStudentNotificationMessage(String disciplineName, String newStatus, EmployeeProfileDto employee) {

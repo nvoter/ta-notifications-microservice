@@ -7,6 +7,7 @@ public record EmployeeProfileDto(
         UUID id,
         String email,
         String fullName,
+        String backupEmail,
         String role,
         boolean isActive,
         OffsetDateTime createdAt,

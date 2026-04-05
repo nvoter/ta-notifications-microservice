@@ -7,6 +7,7 @@ public record EmployeeConfirmationCodeGeneratedEvent(
         UUID eventId,
         UUID employeeId,
         String email,
+        String backupEmail,
         String fullName,
         String confirmationCode,
         OffsetDateTime generatedAt

@@ -12,6 +12,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -30,6 +32,7 @@ class EmployeeConfirmationCodeNotificationsProcessorImplTest {
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 "employee@test.com",
+                "employee.backup@test.com",
                 "Petrov Petr Petrovich",
                 "654321",
                 OffsetDateTime.now()
@@ -40,5 +43,26 @@ class EmployeeConfirmationCodeNotificationsProcessorImplTest {
         service.process(event);
 
         verify(emailService).sendHtmlEmail("employee@test.com", "Код подтверждения для входа", "<html/>");
+        verify(emailService).sendHtmlEmail("employee.backup@test.com", "Код подтверждения для входа", "<html/>");
+    }
+
+    @Test
+    void process_whenBackupEmailBlankOrSame_thenSendSingleEmail() {
+        EmployeeConfirmationCodeGeneratedEvent event = new EmployeeConfirmationCodeGeneratedEvent(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                "employee@test.com",
+                " employee@test.com ",
+                "Petrov Petr Petrovich",
+                "654321",
+                OffsetDateTime.now()
+        );
+        when(confirmationCodeEmailTemplateService.buildHtml("Petrov Petr Petrovich", null, null, "654321"))
+                .thenReturn("<html/>");
+
+        service.process(event);
+
+        verify(emailService, times(1)).sendHtmlEmail("employee@test.com", "Код подтверждения для входа", "<html/>");
+        verify(emailService, never()).sendHtmlEmail(" employee@test.com ", "Код подтверждения для входа", "<html/>");
     }
 }

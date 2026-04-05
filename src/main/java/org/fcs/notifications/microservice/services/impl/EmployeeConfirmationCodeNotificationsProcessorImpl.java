@@ -15,15 +15,36 @@ public class EmployeeConfirmationCodeNotificationsProcessorImpl implements Emplo
 
     @Override
     public void process(EmployeeConfirmationCodeGeneratedEvent event) {
-        emailService.sendHtmlEmail(
-                event.email(),
-                "Код подтверждения для входа",
-                confirmationCodeEmailTemplateService.buildHtml(
-                        event.fullName(),
-                        null,
-                        null,
-                        event.confirmationCode()
-                )
+        String subject = "Код подтверждения для входа";
+        String htmlBody = confirmationCodeEmailTemplateService.buildHtml(
+                event.fullName(),
+                null,
+                null,
+                event.confirmationCode()
         );
+
+        sendEmailIfPresent(event.email(), subject, htmlBody);
+        if (isDistinctEmail(event.backupEmail(), event.email())) {
+            sendEmailIfPresent(event.backupEmail(), subject, htmlBody);
+        }
+    }
+
+    private void sendEmailIfPresent(String email, String subject, String htmlBody) {
+        if (email == null || email.isBlank()) {
+            return;
+        }
+
+        emailService.sendHtmlEmail(email, subject, htmlBody);
+    }
+
+    private boolean isDistinctEmail(String email, String referenceEmail) {
+        if (email == null || email.isBlank()) {
+            return false;
+        }
+        if (referenceEmail == null || referenceEmail.isBlank()) {
+            return true;
+        }
+
+        return !email.trim().equalsIgnoreCase(referenceEmail.trim());
     }
 }

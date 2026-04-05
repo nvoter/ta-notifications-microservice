@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -59,7 +60,7 @@ class ApplicationStatusNotificationsProcessorImplTest {
     void process_whenNotificationsMissing_thenSaveAndSendEmails() {
         ApplicationDisciplineStatusUpdatedEvent event = event("APPROVED");
         StudentProfileDto student = student(event.studentId(), "student@test.com", "Иванов", "Иван", " ", " ");
-        EmployeeProfileDto employee = employee(event.employeeId(), "teacher@test.com", "Петров Петр Петрович");
+        EmployeeProfileDto employee = employee(event.employeeId(), "teacher@test.com", "teacher.backup@test.com", "Петров Петр Петрович");
         DisciplineDetailsDto discipline = discipline(event.disciplineId(), "Math & <Stats>", "assignment");
         when(notificationsRepository.existsByEventIdAndRecipientUserId(any(), any())).thenReturn(false);
         when(usersServiceClient.getEmployeeById(event.employeeId())).thenReturn(employee);
@@ -75,13 +76,14 @@ class ApplicationStatusNotificationsProcessorImplTest {
         assertTrue(notificationCaptor.getAllValues().getLast().getMessage().contains("Иванов Иван"));
         verify(emailService).sendHtmlEmail(eq("student@test.com"), eq("Изменен статус заявки на дисциплину"), any());
         verify(emailService).sendHtmlEmail(eq("teacher@test.com"), eq("Подтверждение изменения статуса заявки"), any());
+        verify(emailService).sendHtmlEmail(eq("teacher.backup@test.com"), eq("Подтверждение изменения статуса заявки"), any());
     }
 
     @Test
     void process_whenInterestedStatus_thenIncludeAssignmentOnlyInEmails() {
         ApplicationDisciplineStatusUpdatedEvent event = event("INTERESTED");
         StudentProfileDto student = student(event.studentId(), "student@test.com", "Иванов", "Иван", "Иванович", "@ivanov");
-        EmployeeProfileDto employee = employee(event.employeeId(), "teacher@test.com", "Петров Петр Петрович");
+        EmployeeProfileDto employee = employee(event.employeeId(), "teacher@test.com", null, "Петров Петр Петрович");
         DisciplineDetailsDto discipline = discipline(event.disciplineId(), "Math", "Решить 5 задач <до пятницы>");
         when(notificationsRepository.existsByEventIdAndRecipientUserId(any(), any())).thenReturn(false);
         when(usersServiceClient.getEmployeeById(event.employeeId())).thenReturn(employee);
@@ -103,7 +105,7 @@ class ApplicationStatusNotificationsProcessorImplTest {
     void process_whenStatusIsNotInterested_thenDoNotIncludeAssignmentInEmails() {
         ApplicationDisciplineStatusUpdatedEvent event = event("AGREED");
         when(notificationsRepository.existsByEventIdAndRecipientUserId(any(), any())).thenReturn(false);
-        when(usersServiceClient.getEmployeeById(event.employeeId())).thenReturn(employee(event.employeeId(), "teacher@test.com", "Петров Петр Петрович"));
+        when(usersServiceClient.getEmployeeById(event.employeeId())).thenReturn(employee(event.employeeId(), "teacher@test.com", null, "Петров Петр Петрович"));
         when(usersServiceClient.getStudentById(event.studentId())).thenReturn(student(event.studentId(), "student@test.com", "Иванов", "Иван", "Иванович", "@ivanov"));
         when(disciplinesServiceClient.getDisciplineById(event.disciplineId())).thenReturn(discipline(event.disciplineId(), "Math", "Скрытое задание"));
 
@@ -122,7 +124,7 @@ class ApplicationStatusNotificationsProcessorImplTest {
         ApplicationDisciplineStatusUpdatedEvent event = event("UNKNOWN");
         when(notificationsRepository.existsByEventIdAndRecipientUserId(event.eventId(), event.studentId())).thenReturn(true);
         when(notificationsRepository.existsByEventIdAndRecipientUserId(event.eventId(), event.employeeId())).thenReturn(false);
-        when(usersServiceClient.getEmployeeById(event.employeeId())).thenReturn(employee(event.employeeId(), "teacher@test.com", "Petrov Petr"));
+        when(usersServiceClient.getEmployeeById(event.employeeId())).thenReturn(employee(event.employeeId(), "teacher@test.com", null, "Petrov Petr"));
         when(usersServiceClient.getStudentById(event.studentId())).thenReturn(student(event.studentId(), null, null, " ", null, "tg"));
         when(disciplinesServiceClient.getDisciplineById(event.disciplineId())).thenReturn(discipline(event.disciplineId(), "Discipline", "assignment"));
 
@@ -130,6 +132,23 @@ class ApplicationStatusNotificationsProcessorImplTest {
 
         verify(notificationsRepository, times(1)).save(any(Notification.class));
         verify(emailService, times(2)).sendHtmlEmail(any(), any(), any());
+    }
+
+    @Test
+    void process_whenBackupEmailBlankOrSame_thenSendEmployeeEmailOnce() {
+        ApplicationDisciplineStatusUpdatedEvent event = event("APPROVED");
+        when(notificationsRepository.existsByEventIdAndRecipientUserId(any(), any())).thenReturn(false);
+        when(usersServiceClient.getEmployeeById(event.employeeId()))
+                .thenReturn(employee(event.employeeId(), "teacher@test.com", " teacher@test.com ", "Петров Петр Петрович"));
+        when(usersServiceClient.getStudentById(event.studentId()))
+                .thenReturn(student(event.studentId(), "student@test.com", "Иванов", "Иван", "Иванович", "@ivanov"));
+        when(disciplinesServiceClient.getDisciplineById(event.disciplineId()))
+                .thenReturn(discipline(event.disciplineId(), "Math", "assignment"));
+
+        service.process(event);
+
+        verify(emailService, atLeastOnce()).sendHtmlEmail(eq("student@test.com"), any(), any());
+        verify(emailService, times(1)).sendHtmlEmail(eq("teacher@test.com"), eq("Подтверждение изменения статуса заявки"), any());
     }
 
     private static ApplicationDisciplineStatusUpdatedEvent event(String status) {
@@ -165,11 +184,12 @@ class ApplicationStatusNotificationsProcessorImplTest {
         );
     }
 
-    private static EmployeeProfileDto employee(UUID id, String email, String fullName) {
+    private static EmployeeProfileDto employee(UUID id, String email, String backupEmail, String fullName) {
         return new EmployeeProfileDto(
                 id,
                 email,
                 fullName,
+                backupEmail,
                 "TEACHER",
                 true,
                 OffsetDateTime.now(),
