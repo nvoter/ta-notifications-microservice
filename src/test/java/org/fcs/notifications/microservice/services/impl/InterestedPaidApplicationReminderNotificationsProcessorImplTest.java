@@ -67,7 +67,7 @@ class InterestedPaidApplicationReminderNotificationsProcessorImplTest {
         verify(emailService).sendHtmlEmail(
                 eq("second@test.com"),
                 eq("Напоминание о загрузке документов"),
-                contains("Если Вы недавно уже заполняли форму, проигнорируйте это письмо.")
+                contains("Если Вы недавно уже заполняли форму, проигнорируйте это письмо")
         );
     }
 
@@ -111,6 +111,7 @@ class InterestedPaidApplicationReminderNotificationsProcessorImplTest {
                         "Петров Петр Петрович",
                         "teacher.backup@test.com",
                         "TEACHER",
+                        true,
                         true,
                         OffsetDateTime.now(),
                         OffsetDateTime.now()
@@ -161,6 +162,7 @@ class InterestedPaidApplicationReminderNotificationsProcessorImplTest {
                         "Петров Петр Петрович",
                         " teacher@test.com ",
                         "TEACHER",
+                        true,
                         true,
                         OffsetDateTime.now(),
                         OffsetDateTime.now()

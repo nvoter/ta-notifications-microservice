@@ -151,14 +151,58 @@ class ApplicationStatusNotificationsProcessorImplTest {
         verify(emailService, times(1)).sendHtmlEmail(eq("teacher@test.com"), eq("Подтверждение изменения статуса заявки"), any());
     }
 
+    @Test
+    void process_whenStatusEmailsDisabled_thenSendOnlyStudentEmail() {
+        ApplicationDisciplineStatusUpdatedEvent event = event("APPROVED");
+        when(notificationsRepository.existsByEventIdAndRecipientUserId(any(), any())).thenReturn(false);
+        when(usersServiceClient.getEmployeeById(event.employeeId()))
+                .thenReturn(employee(event.employeeId(), "teacher@test.com", "teacher.backup@test.com", "Петров Петр Петрович", false));
+        when(usersServiceClient.getStudentById(event.studentId()))
+                .thenReturn(student(event.studentId(), "student@test.com", "Иванов", "Иван", "Иванович", "@ivanov"));
+        when(disciplinesServiceClient.getDisciplineById(event.disciplineId()))
+                .thenReturn(discipline(event.disciplineId(), "Math", "assignment"));
+
+        service.process(event);
+
+        verify(emailService, times(1)).sendHtmlEmail(eq("student@test.com"), any(), any());
+        verify(emailService, never()).sendHtmlEmail(eq("teacher@test.com"), eq("Подтверждение изменения статуса заявки"), any());
+        verify(emailService, never()).sendHtmlEmail(eq("teacher.backup@test.com"), eq("Подтверждение изменения статуса заявки"), any());
+    }
+
+    @Test
+    void process_whenRejectedAfterNonNew_thenSendMandatoryEmailToPreviousEmployee() {
+        UUID previousEmployeeId = UUID.randomUUID();
+        ApplicationDisciplineStatusUpdatedEvent event = event("AGREED", "REJECTED", previousEmployeeId);
+        when(notificationsRepository.existsByEventIdAndRecipientUserId(any(), any())).thenReturn(false);
+        when(usersServiceClient.getEmployeeById(event.employeeId()))
+                .thenReturn(employee(event.employeeId(), "admin@test.com", null, "Администратор Админ", true));
+        when(usersServiceClient.getEmployeeById(previousEmployeeId))
+                .thenReturn(employee(previousEmployeeId, "teacher@test.com", "teacher.backup@test.com", "Петров Петр Петрович", false));
+        when(usersServiceClient.getStudentById(event.studentId()))
+                .thenReturn(student(event.studentId(), "student@test.com", "Иванов", "Иван", "Иванович", "@ivanov"));
+        when(disciplinesServiceClient.getDisciplineById(event.disciplineId()))
+                .thenReturn(discipline(event.disciplineId(), "Math", "assignment"));
+
+        service.process(event);
+
+        verify(emailService).sendHtmlEmail(eq("teacher@test.com"), eq("Заявка студента была отклонено"), any());
+        verify(emailService).sendHtmlEmail(eq("teacher.backup@test.com"), eq("Заявка студента была отклонено"), any());
+    }
+
     private static ApplicationDisciplineStatusUpdatedEvent event(String status) {
+        return event(null, status, null);
+    }
+
+    private static ApplicationDisciplineStatusUpdatedEvent event(String previousStatus, String status, UUID previousEmployeeId) {
         return new ApplicationDisciplineStatusUpdatedEvent(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 UUID.randomUUID(),
+                previousStatus,
                 status,
                 UUID.randomUUID(),
+                previousEmployeeId,
                 UUID.randomUUID(),
                 OffsetDateTime.now()
         );
@@ -185,6 +229,10 @@ class ApplicationStatusNotificationsProcessorImplTest {
     }
 
     private static EmployeeProfileDto employee(UUID id, String email, String backupEmail, String fullName) {
+        return employee(id, email, backupEmail, fullName, true);
+    }
+
+    private static EmployeeProfileDto employee(UUID id, String email, String backupEmail, String fullName, boolean isStatusNotificationEmailEnabled) {
         return new EmployeeProfileDto(
                 id,
                 email,
@@ -192,6 +240,7 @@ class ApplicationStatusNotificationsProcessorImplTest {
                 backupEmail,
                 "TEACHER",
                 true,
+                isStatusNotificationEmailEnabled,
                 OffsetDateTime.now(),
                 OffsetDateTime.now()
         );

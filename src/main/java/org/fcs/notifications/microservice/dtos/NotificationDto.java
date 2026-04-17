@@ -5,7 +5,7 @@ import org.fcs.notifications.microservice.entities.Notification;
 import org.fcs.notifications.microservice.models.EntityType;
 import org.fcs.notifications.microservice.models.NotificationType;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Schema(description = "Уведомление пользователя")
@@ -23,7 +23,7 @@ public record NotificationDto(
         @Schema(description = "Текст уведомления", example = "По выбранной дисциплине изменен статус рассмотрения.")
         String message,
         @Schema(description = "Дата и время создания", example = "2026-03-27T12:00:00")
-        LocalDateTime createdAt,
+        OffsetDateTime createdAt,
         @Schema(description = "Признак прочитанного уведомления", example = "false")
         boolean isRead
 ) {

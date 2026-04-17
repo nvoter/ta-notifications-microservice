@@ -8,7 +8,7 @@ import lombok.Setter;
 import org.fcs.notifications.microservice.models.EntityType;
 import org.fcs.notifications.microservice.models.NotificationType;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Getter
@@ -47,7 +47,7 @@ public class Notification {
     private String message;
 
     @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
 
     @Column(name = "is_read", nullable = false)
     private boolean read;

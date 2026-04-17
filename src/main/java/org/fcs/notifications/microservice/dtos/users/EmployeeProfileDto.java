@@ -10,6 +10,7 @@ public record EmployeeProfileDto(
         String backupEmail,
         String role,
         boolean isActive,
+        boolean isStatusNotificationEmailEnabled,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {

@@ -8,8 +8,10 @@ public record ApplicationDisciplineStatusUpdatedEvent(
         UUID applicationId,
         UUID applicationDisciplineId,
         UUID disciplineId,
+        String previousStatus,
         String newStatus,
         UUID employeeId,
+        UUID previousEmployeeId,
         UUID studentId,
         OffsetDateTime occurredAt
 ) {

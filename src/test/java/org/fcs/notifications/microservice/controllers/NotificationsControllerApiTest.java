@@ -12,7 +12,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -89,7 +89,7 @@ class NotificationsControllerApiTest {
                 NotificationType.APPLICATION_STATUS_UPDATED,
                 "title",
                 "message",
-                LocalDateTime.now(),
+                OffsetDateTime.now(),
                 false
         );
     }

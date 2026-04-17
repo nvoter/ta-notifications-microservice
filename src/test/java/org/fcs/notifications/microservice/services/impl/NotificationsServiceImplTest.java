@@ -12,7 +12,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -96,7 +96,7 @@ class NotificationsServiceImplTest {
         notification.setNotificationType(NotificationType.APPLICATION_STATUS_UPDATED);
         notification.setTitle("title");
         notification.setMessage("message");
-        notification.setCreatedAt(LocalDateTime.now());
+        notification.setCreatedAt(OffsetDateTime.now());
         notification.setRead(false);
         return notification;
     }

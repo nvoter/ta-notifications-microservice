@@ -34,7 +34,7 @@ spring:
     locations: classpath:db/migration
 
 server:
-  port: ${SERVER_PORT:8088}
+  port: ${SERVER_PORT:8087}
 
 app:
   internal:
@@ -64,7 +64,7 @@ app:
 
 clients:
   users:
-    base-url: ${USERS_SERVICE_BASE_URL:http://users-microservice:8089/api/v1}
+    base-url: ${USERS_SERVICE_BASE_URL:http://users-microservice:8083/api/v1}
   disciplines:
     base-url: ${DISCIPLINES_SERVICE_BASE_URL:http://disciplines-microservice:8084/api/v1}
 

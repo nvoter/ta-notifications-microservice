@@ -17,7 +17,7 @@ import org.fcs.notifications.microservice.services.EmailService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Slf4j
@@ -60,7 +60,10 @@ public class ApplicationStatusNotificationsProcessorImpl implements ApplicationS
         );
 
         sendStudentEmail(student, employee, discipline.name(), discipline.assignment(), event.newStatus());
-        sendEmployeeEmail(employee, student, discipline.name(), discipline.assignment(), event.newStatus());
+        if (employee.isStatusNotificationEmailEnabled()) {
+            sendEmployeeEmail(employee, student, discipline.name(), discipline.assignment(), event.newStatus());
+        }
+        sendPreviousEmployeeMandatoryEmailIfNeeded(event, employee, student, discipline);
         log.info(
                 "Обработано событие обновления статуса заявки: eventId={}, applicationDisciplineId={}",
                 event.eventId(),
@@ -86,7 +89,7 @@ public class ApplicationStatusNotificationsProcessorImpl implements ApplicationS
         notification.setNotificationType(NotificationType.APPLICATION_STATUS_UPDATED);
         notification.setTitle(title);
         notification.setMessage(message);
-        notification.setCreatedAt(LocalDateTime.now());
+        notification.setCreatedAt(OffsetDateTime.now());
         notification.setRead(false);
         notificationsRepository.save(notification);
     }
@@ -115,6 +118,25 @@ public class ApplicationStatusNotificationsProcessorImpl implements ApplicationS
         String subject = "Подтверждение изменения статуса заявки";
         String htmlBody = buildEmployeeEmailHtml(student, disciplineName, assignment, newStatus);
         sendEmailToEmployeeAddresses(employee.email(), employee.backupEmail(), subject, htmlBody);
+    }
+
+    private void sendPreviousEmployeeMandatoryEmailIfNeeded(
+            ApplicationDisciplineStatusUpdatedEvent event,
+            EmployeeProfileDto currentEmployee,
+            StudentProfileDto student,
+            DisciplineDetailsDto discipline
+    ) {
+        if (!isMandatoryPreviousEmployeeEmail(event)) {
+            return;
+        }
+        if (event.previousEmployeeId() == null || event.previousEmployeeId().equals(currentEmployee.id())) {
+            return;
+        }
+
+        EmployeeProfileDto previousEmployee = usersServiceClient.getEmployeeById(event.previousEmployeeId());
+        String subject = "Заявка студента была " + russianStatus(event.newStatus()).toLowerCase();
+        String htmlBody = buildPreviousEmployeeEmailHtml(previousEmployee, currentEmployee, student, discipline.name(), event.newStatus());
+        sendEmailToEmployeeAddresses(previousEmployee.email(), previousEmployee.backupEmail(), subject, htmlBody);
     }
 
     private void sendEmailToEmployeeAddresses(String email, String backupEmail, String subject, String htmlBody) {
@@ -212,6 +234,34 @@ public class ApplicationStatusNotificationsProcessorImpl implements ApplicationS
         );
     }
 
+    private String buildPreviousEmployeeEmailHtml(
+            EmployeeProfileDto previousEmployee,
+            EmployeeProfileDto currentEmployee,
+            StudentProfileDto student,
+            String disciplineName,
+            String newStatus
+    ) {
+        return buildEmailShell(
+                "Статус заявки изменен",
+                """
+                <p class="description">%s, заявка студента %s на дисциплину %s была %s</p>
+                <div class="details">
+                  <p class="detail-line">Новый статус был установлен сотрудником:</p>
+                  <p class="detail-line">%s</p>
+                  <p class="detail-line">Email сотрудника:</p>
+                  <p class="detail-line">%s</p>
+                </div>
+                """.formatted(
+                        escapeHtml(fallback(previousEmployee.fullName(), "Здравствуйте")),
+                        escapeHtml(student.fullName()),
+                        escapeHtml(disciplineName),
+                        escapeHtml(russianStatus(newStatus).toLowerCase()),
+                        escapeHtml(currentEmployee.fullName()),
+                        escapeHtml(fallback(currentEmployee.email(), "Не указан"))
+                )
+        );
+    }
+
     private String buildAssignmentHtml(String status, String assignment) {
         if (!"INTERESTED".equals(normalizeStatus(status))) {
             return "";
@@ -296,6 +346,14 @@ public class ApplicationStatusNotificationsProcessorImpl implements ApplicationS
                 escapeHtml(title),
                 content
         );
+    }
+
+    private boolean isMandatoryPreviousEmployeeEmail(ApplicationDisciplineStatusUpdatedEvent event) {
+        String normalizedNewStatus = normalizeStatus(event.newStatus());
+        String normalizedPreviousStatus = normalizeStatus(event.previousStatus());
+        return ("REJECTED".equals(normalizedNewStatus) || "DELETED".equals(normalizedNewStatus))
+                && !normalizedPreviousStatus.isBlank()
+                && !"NEW".equals(normalizedPreviousStatus);
     }
 
     private String russianStatus(String status) {
