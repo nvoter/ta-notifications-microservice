@@ -60,7 +60,7 @@ public class ApplicationStatusNotificationsProcessorImpl implements ApplicationS
         );
 
         sendStudentEmail(student, employee, discipline.name(), discipline.assignment(), event.newStatus());
-        if (employee.isStatusNotificationEmailEnabled()) {
+        if (shouldSendEmployeeStatusEmail(employee, event.newStatus())) {
             sendEmployeeEmail(employee, student, discipline.name(), discipline.assignment(), event.newStatus());
         }
         sendPreviousEmployeeMandatoryEmailIfNeeded(event, employee, student, discipline);
@@ -137,6 +137,10 @@ public class ApplicationStatusNotificationsProcessorImpl implements ApplicationS
         String subject = "Заявка студента была " + russianStatus(event.newStatus()).toLowerCase();
         String htmlBody = buildPreviousEmployeeEmailHtml(previousEmployee, currentEmployee, student, discipline.name(), event.newStatus());
         sendEmailToEmployeeAddresses(previousEmployee.email(), previousEmployee.backupEmail(), subject, htmlBody);
+    }
+
+    private boolean shouldSendEmployeeStatusEmail(EmployeeProfileDto employee, String newStatus) {
+        return "APPROVED".equals(normalizeStatus(newStatus)) || employee.isStatusNotificationEmailEnabled();
     }
 
     private void sendEmailToEmployeeAddresses(String email, String backupEmail, String subject, String htmlBody) {
