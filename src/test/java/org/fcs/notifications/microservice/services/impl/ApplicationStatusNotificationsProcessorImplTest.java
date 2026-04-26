@@ -152,8 +152,43 @@ class ApplicationStatusNotificationsProcessorImplTest {
     }
 
     @Test
-    void process_whenStatusEmailsDisabled_thenSendOnlyStudentEmail() {
+    void process_whenApprovedAndStatusEmailsDisabled_thenStillSendEmployeeEmail() {
         ApplicationDisciplineStatusUpdatedEvent event = event("APPROVED");
+        when(notificationsRepository.existsByEventIdAndRecipientUserId(any(), any())).thenReturn(false);
+        when(usersServiceClient.getEmployeeById(event.employeeId()))
+                .thenReturn(employee(event.employeeId(), "teacher@test.com", "teacher.backup@test.com", "Петров Петр Петрович", false));
+        when(usersServiceClient.getStudentById(event.studentId()))
+                .thenReturn(student(event.studentId(), "student@test.com", "Иванов", "Иван", "Иванович", "@ivanov"));
+        when(disciplinesServiceClient.getDisciplineById(event.disciplineId()))
+                .thenReturn(discipline(event.disciplineId(), "Math", "assignment"));
+
+        service.process(event);
+
+        verify(emailService).sendHtmlEmail(eq("student@test.com"), any(), any());
+        verify(emailService).sendHtmlEmail(eq("teacher@test.com"), eq("Подтверждение изменения статуса заявки"), any());
+        verify(emailService).sendHtmlEmail(eq("teacher.backup@test.com"), eq("Подтверждение изменения статуса заявки"), any());
+    }
+
+    @Test
+    void process_whenStudentCourseIsGraduateString_thenProcessSuccessfully() {
+        ApplicationDisciplineStatusUpdatedEvent event = event("APPROVED");
+        when(notificationsRepository.existsByEventIdAndRecipientUserId(any(), any())).thenReturn(false);
+        when(usersServiceClient.getEmployeeById(event.employeeId()))
+                .thenReturn(employee(event.employeeId(), "teacher@test.com", null, "Петров Петр Петрович"));
+        when(usersServiceClient.getStudentById(event.studentId()))
+                .thenReturn(student(event.studentId(), "student@test.com", "Иванов", "Иван", "Иванович", "@ivanov", "Выпускник"));
+        when(disciplinesServiceClient.getDisciplineById(event.disciplineId()))
+                .thenReturn(discipline(event.disciplineId(), "Math", "assignment"));
+
+        service.process(event);
+
+        verify(notificationsRepository, times(2)).save(any(Notification.class));
+        verify(emailService).sendHtmlEmail(eq("student@test.com"), any(), any());
+    }
+
+    @Test
+    void process_whenAgreedAndStatusEmailsDisabled_thenDoNotSendEmployeeEmail() {
+        ApplicationDisciplineStatusUpdatedEvent event = event("AGREED");
         when(notificationsRepository.existsByEventIdAndRecipientUserId(any(), any())).thenReturn(false);
         when(usersServiceClient.getEmployeeById(event.employeeId()))
                 .thenReturn(employee(event.employeeId(), "teacher@test.com", "teacher.backup@test.com", "Петров Петр Петрович", false));
@@ -209,6 +244,18 @@ class ApplicationStatusNotificationsProcessorImplTest {
     }
 
     private static StudentProfileDto student(UUID id, String email, String lastName, String firstName, String middleName, String telegram) {
+        return student(id, email, lastName, firstName, middleName, telegram, null);
+    }
+
+    private static StudentProfileDto student(
+            UUID id,
+            String email,
+            String lastName,
+            String firstName,
+            String middleName,
+            String telegram,
+            String course
+    ) {
         return new StudentProfileDto(
                 id,
                 email,
@@ -220,7 +267,7 @@ class ApplicationStatusNotificationsProcessorImplTest {
                 null,
                 null,
                 null,
-                null,
+                course,
                 null,
                 true,
                 OffsetDateTime.now(),

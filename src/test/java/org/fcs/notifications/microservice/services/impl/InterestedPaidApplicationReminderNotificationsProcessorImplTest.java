@@ -62,7 +62,7 @@ class InterestedPaidApplicationReminderNotificationsProcessorImplTest {
         verify(emailService).sendHtmlEmail(
                 eq("first@test.com"),
                 eq("Напоминание о загрузке документов"),
-                contains("Иван Иванович, Вы подавали заявку на трудоустройство учебным ассистентом на платной основе")
+                contains("https://assistent.cs.hse.ru/student/documents")
         );
         verify(emailService).sendHtmlEmail(
                 eq("second@test.com"),
@@ -138,7 +138,7 @@ class InterestedPaidApplicationReminderNotificationsProcessorImplTest {
         verify(emailService).sendHtmlEmail(
                 eq("teacher@test.com"),
                 eq("Напоминание о загрузке документов студентов"),
-                contains("Пожалуйста, напомните им заполнить форму сбора документов")
+                contains("https://assistent.cs.hse.ru/student/documents")
         );
     }
 
