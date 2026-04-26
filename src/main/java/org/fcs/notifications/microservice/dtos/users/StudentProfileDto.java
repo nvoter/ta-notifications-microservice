@@ -14,7 +14,7 @@ public record StudentProfileDto(
         String educationLevel,
         String faculty,
         String educationalProgram,
-        Integer course,
+        String course,
         String citizenship,
         boolean isProfileCompleted,
         OffsetDateTime createdAt,
