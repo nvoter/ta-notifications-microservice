@@ -24,6 +24,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class InterestedPaidApplicationReminderNotificationsProcessorImpl
         implements InterestedPaidApplicationReminderNotificationsProcessor {
+    private static final String DOCUMENTS_URL = "https://assistent.cs.hse.ru/student/documents";
+
     private final UsersServiceClient usersServiceClient;
     private final EmailService emailService;
 
@@ -110,11 +112,14 @@ public class InterestedPaidApplicationReminderNotificationsProcessorImpl
         return buildEmailShell(
                 "Напоминание о документах",
                 """
-                <p class="description">%s, Вы подавали заявку на трудоустройство учебным ассистентом на платной основе. Пожалуйста, заполните форму сбора документов в личном кабинете для дальнейшей обработки заявки</p>
+                <p class="description">%s, Вы подавали заявку на трудоустройство учебным ассистентом на платной основе. Пожалуйста, заполните <a href="%s">форму сбора документов в личном кабинете</a> для дальнейшей обработки заявки</p>
                 <div class="footnotes">
                   <p class="footnote">Если Вы недавно уже заполняли форму, проигнорируйте это письмо</p>
                 </div>
-                """.formatted(escapeHtml(fallback(student.displayName(), "Здравствуйте")))
+                """.formatted(
+                        escapeHtml(fallback(student.displayName(), "Здравствуйте")),
+                        DOCUMENTS_URL
+                )
         );
     }
 
@@ -131,11 +136,12 @@ public class InterestedPaidApplicationReminderNotificationsProcessorImpl
                   %s
                 </div>
                 <div class="footnotes">
-                  <p class="footnote">Пожалуйста, напомните им заполнить форму сбора документов в личном кабинете для дальнейшей обработки заявки</p>
+                  <p class="footnote">Пожалуйста, напомните им заполнить <a href="%s">форму сбора документов в личном кабинете</a> для дальнейшей обработки заявки</p>
                 </div>
                 """.formatted(
                         escapeHtml(fallback(shortEmployeeName(employee.fullName()), "Здравствуйте")),
-                        studentsHtml
+                        studentsHtml,
+                        DOCUMENTS_URL
                 )
         );
     }
